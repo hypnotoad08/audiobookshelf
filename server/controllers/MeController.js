@@ -653,5 +653,27 @@ class MeController {
     const data = await userStats.getStatsForYear(req.user.id, year)
     res.json(data)
   }
+
+  /**
+   * PATCH: /api/me/client-settings
+   *
+   * @param {RequestWithUser} req
+   * @param {Response} res
+   */
+  async updateClientSettings(req, res) {
+    const settings = req.body
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      return res.status(400).send('Invalid payload. Settings object required')
+    }
+
+    const hasUpdates = await req.user.updateClientSettings(settings)
+    if (hasUpdates) {
+      SocketAuthority.clientEmitter(req.user.id, 'user_updated', req.user.toOldJSONForBrowser())
+    }
+
+    res.json({
+      clientSettings: req.user.clientSettings || {}
+    })
+  }
 }
 module.exports = new MeController()

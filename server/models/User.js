@@ -7,6 +7,8 @@ const SocketAuthority = require('../SocketAuthority')
 const { isNullOrNaN } = require('../utils')
 const TokenManager = require('../auth/TokenManager')
 
+const isNumber = (value) => Number.isFinite(value)
+
 class UserCache {
   constructor() {
     this.cache = new LRUCache({ max: 100 })
@@ -118,6 +120,12 @@ class User extends Model {
 
   // Excludes "root" since their can only be 1 root user
   static accountTypes = ['admin', 'user', 'guest']
+
+  /** Client settings the user may persist */
+  static allowedClientSettings = {
+    bookshelfCoverSize: isNumber,
+    bookshelfCoverSizeMobile: isNumber
+  }
 
   /**
    * List of expected permission properties from the client
@@ -526,7 +534,8 @@ class User extends Model {
         lastSeen: DataTypes.DATE,
         permissions: DataTypes.JSON,
         bookmarks: DataTypes.JSON,
-        extraData: DataTypes.JSON
+        extraData: DataTypes.JSON,
+        clientSettings: DataTypes.JSON
       },
       {
         sequelize,
@@ -620,6 +629,7 @@ class User extends Model {
       isOldToken: this.isOldToken,
       mediaProgress: this.mediaProgresses?.map((mp) => mp.getOldMediaProgress()) || [],
       seriesHideFromContinueListening: [...seriesHideFromContinueListening],
+      clientSettings: { ...(this.clientSettings || {}) },
       bookmarks: this.bookmarks?.map((b) => ({ ...b })) || [],
       isActive: this.isActive,
       isLocked: this.isLocked,
@@ -908,6 +918,32 @@ class User extends Model {
     }
     this.bookmarks = this.bookmarks.filter((bm) => bm.libraryItemId !== libraryItemId || bm.time !== time)
     this.changed('bookmarks', true)
+    await this.save()
+    return true
+  }
+
+  /**
+   * @param {Object} settings JSON containing client settings
+   * @returns {Promise<boolean>} true if any setting was changed
+   */
+  async updateClientSettings(settings) {
+    const currentSettings = this.clientSettings || {}
+    const updatedSettings = { ...currentSettings }
+
+    for (const key of Object.keys(User.allowedClientSettings)) {
+      const value = settings[key]
+      if (value === undefined) continue
+      if (!User.allowedClientSettings[key](value)) {
+        Logger.warn(`[User] Invalid value for client setting "${key}": ${value}`)
+        continue
+      }
+      updatedSettings[key] = value
+    }
+
+    if (JSON.stringify(updatedSettings) === JSON.stringify(currentSettings)) return false
+
+    this.clientSettings = updatedSettings
+    this.changed('clientSettings', true)
     await this.save()
     return true
   }
