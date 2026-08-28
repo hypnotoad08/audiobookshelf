@@ -4,10 +4,8 @@ const { LRUCache } = require('lru-cache')
 
 const Logger = require('../Logger')
 const SocketAuthority = require('../SocketAuthority')
-const { isNullOrNaN } = require('../utils')
+const { areEquivalent, isNullOrNaN } = require('../utils')
 const TokenManager = require('../auth/TokenManager')
-
-const isNumber = (value) => Number.isFinite(value)
 
 class UserCache {
   constructor() {
@@ -123,8 +121,8 @@ class User extends Model {
 
   /** Client settings the user may persist */
   static allowedClientSettings = {
-    bookshelfCoverSize: isNumber,
-    bookshelfCoverSizeMobile: isNumber
+    bookshelfCoverSize: Number.isFinite,
+    bookshelfCoverSizeMobile: Number.isFinite
   }
 
   /**
@@ -940,7 +938,7 @@ class User extends Model {
       updatedSettings[key] = value
     }
 
-    if (JSON.stringify(updatedSettings) === JSON.stringify(currentSettings)) return false
+    if (areEquivalent(updatedSettings, currentSettings)) return false
 
     this.clientSettings = updatedSettings
     this.changed('clientSettings', true)

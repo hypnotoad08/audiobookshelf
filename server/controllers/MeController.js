@@ -4,7 +4,7 @@ const Logger = require('../Logger')
 const SocketAuthority = require('../SocketAuthority')
 const Database = require('../Database')
 const { sort } = require('../libs/fastSort')
-const { toNumber, isNullOrNaN, isUUID } = require('../utils/index')
+const { toNumber, isNullOrNaN, isObject, isUUID } = require('../utils/index')
 const userStats = require('../utils/queries/userStats')
 const parseUserAgent = require('../utils/parsers/parseUserAgent')
 
@@ -662,7 +662,7 @@ class MeController {
    */
   async updateClientSettings(req, res) {
     const settings = req.body
-    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+    if (!isObject(settings) || Array.isArray(settings)) {
       return res.status(400).send('Invalid payload. Settings object required')
     }
 
