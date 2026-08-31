@@ -111,9 +111,13 @@ describe('User client settings', () => {
   })
 
   describe('client id validation', () => {
-    it('rejects prototype polluting, empty and oversized ids', () => {
-      expect(User.validateClientId('__proto__')).to.be.a('string')
-      expect(User.validateClientId('constructor')).to.be.a('string')
+    it('rejects reserved ids as reserved rather than malformed', () => {
+      for (const clientId of User.unsafeObjectKeys) {
+        expect(User.validateClientId(clientId), clientId).to.match(/is reserved/)
+      }
+    })
+
+    it('rejects empty, oversized and malformed ids', () => {
       expect(User.validateClientId('')).to.be.a('string')
       expect(User.validateClientId(undefined)).to.be.a('string')
       expect(User.validateClientId('a'.repeat(65))).to.be.a('string')
@@ -150,6 +154,13 @@ describe('User client settings', () => {
       expect(User.validateClientSettings('abs-web-react', {})).to.be.a('string')
       expect(User.validateClientSettings('abs-web-react', { 'bad.name': 1 })).to.be.a('string')
       expect(User.validateClientSettings('abs-web-react', { ['a'.repeat(65)]: 1 })).to.be.a('string')
+    })
+
+    it('rejects reserved setting names as reserved rather than malformed', () => {
+      for (const key of User.unsafeObjectKeys) {
+        expect(User.validateClientSettings('abs-web-react', { [key]: 1 }), key).to.match(/is reserved/)
+        expect(User.validateClientSettings('abs-web-react', { nested: { [key]: 1 } }), `nested ${key}`).to.match(/reserved key/)
+      }
     })
 
     it('rejects oversized payloads and values', () => {

@@ -964,8 +964,8 @@ class User extends Model {
 
       if (!isArray) {
         for (const key of Object.keys(value)) {
-          if (!User.clientSettingKeyPattern.test(key)) return `contains invalid key "${key}"`
           if (User.unsafeObjectKeys.includes(key)) return `contains reserved key "${key}"`
+          if (!User.clientSettingKeyPattern.test(key)) return `contains invalid key "${key}"`
         }
       }
 
@@ -987,8 +987,8 @@ class User extends Model {
    */
   static validateClientId(clientId) {
     if (!clientId || typeof clientId !== 'string') return 'Client id is required'
-    if (!User.clientIdPattern.test(clientId)) return 'Client id must start with a letter and may contain letters, digits, . _ or -, up to 64 characters'
     if (User.unsafeObjectKeys.includes(clientId)) return `Client id "${clientId}" is reserved`
+    if (!User.clientIdPattern.test(clientId)) return 'Client id must start with a letter and may contain letters, digits, . _ or -, up to 64 characters'
     return null
   }
 
@@ -1013,8 +1013,8 @@ class User extends Model {
     if (keys.length > limits.maxKeys) return `A client cannot store more than ${limits.maxKeys} settings`
 
     for (const key of keys) {
-      if (!User.clientSettingKeyPattern.test(key)) return `Invalid client setting name "${key}"`
       if (User.unsafeObjectKeys.includes(key)) return `Client setting name "${key}" is reserved`
+      if (!User.clientSettingKeyPattern.test(key)) return `Invalid client setting name "${key}"`
 
       if (settings[key] === null) continue
 
