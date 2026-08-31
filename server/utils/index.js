@@ -46,6 +46,20 @@ module.exports.isObject = (val) => {
   return val !== null && typeof val === 'object'
 }
 
+/**
+ * True for objects that round trip through JSON unchanged.
+ * Unlike isObject, this excludes arrays and class instances such as Date and Buffer.
+ * Only the object itself is checked, not the values inside it.
+ *
+ * @param {*} val
+ * @returns {boolean}
+ */
+module.exports.isJsonObject = (val) => {
+  if (!this.isObject(val)) return false
+  const proto = Object.getPrototypeOf(val)
+  return proto === Object.prototype || proto === null
+}
+
 module.exports.comparePaths = (path1, path2) => {
   return path1 === path2 || Path.normalize(path1) === Path.normalize(path2)
 }
@@ -163,6 +177,18 @@ module.exports.copyValue = (val) => {
     }
     return final
   }
+}
+
+/**
+ * Serialized size of a value in UTF-8 bytes.
+ * String length counts UTF-16 code units, so it understates multi byte characters:
+ * a 1024 character string of accented or CJK text is 2-3x that many bytes on disk.
+ *
+ * @param {*} value
+ * @returns {number}
+ */
+module.exports.jsonByteLength = (value) => {
+  return Buffer.byteLength(JSON.stringify(value), 'utf8')
 }
 
 module.exports.toNumber = (val, fallback = 0) => {
