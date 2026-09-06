@@ -4,7 +4,7 @@ const { LRUCache } = require('lru-cache')
 
 const Logger = require('../Logger')
 const SocketAuthority = require('../SocketAuthority')
-const { areEquivalent, isNullOrNaN, isJsonObject, jsonByteLength } = require('../utils')
+const { areEquivalent, isNullOrNaN, jsonByteLength } = require('../utils')
 const TokenManager = require('../auth/TokenManager')
 
 class UserCache {
@@ -121,12 +121,10 @@ class User extends Model {
 
   /** Clients name their own settings, so only structure and size are bounded */
   static clientSettingsLimits = {
-    maxPayloadBytes: 3072,
     maxBytesPerClient: 2048,
     maxBytes: 25600,
     maxKeys: 64,
     maxClients: 12,
-    maxDepth: 3,
     maxStringLength: 1024
   }
 
@@ -135,7 +133,7 @@ class User extends Model {
 
   static clientSettingKeyPattern = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
 
-  /** Rejected as client ids and setting names at every depth, independently of the patterns above */
+  /** Rejected as client ids and setting names, independently of the patterns above */
   static unsafeObjectKeys = ['__proto__', 'constructor', 'prototype']
 
   /**
@@ -937,16 +935,14 @@ class User extends Model {
   }
 
   /**
-   * Validate one setting value, which must be JSON data
+   * Validate one setting value, which must be a primitive
    *
    * @param {*} value
-   * @param {number} [depth=1] current nesting depth
    * @returns {string|null} error message, or null when the value is valid
    */
-  static validateClientSettingValue(value, depth = 1) {
+  static validateClientSettingValue(value) {
     const limits = User.clientSettingsLimits
 
-    if (value === null) return null
     if (typeof value === 'boolean') return null
     if (typeof value === 'number') {
       if (!Number.isFinite(value)) return 'must be a finite number'
@@ -958,25 +954,7 @@ class User extends Model {
       return null
     }
 
-    const isArray = Array.isArray(value)
-    if (isArray || isJsonObject(value)) {
-      if (depth >= limits.maxDepth) return `exceeds maximum nesting depth of ${limits.maxDepth}`
-
-      if (!isArray) {
-        for (const key of Object.keys(value)) {
-          if (User.unsafeObjectKeys.includes(key)) return `contains reserved key "${key}"`
-          if (!User.clientSettingKeyPattern.test(key)) return `contains invalid key "${key}"`
-        }
-      }
-
-      for (const entry of isArray ? value : Object.values(value)) {
-        const error = User.validateClientSettingValue(entry, depth + 1)
-        if (error) return error
-      }
-      return null
-    }
-
-    return 'must be a JSON value'
+    return 'must be a string, number or boolean'
   }
 
   /**
@@ -1005,8 +983,6 @@ class User extends Model {
 
     const clientIdError = User.validateClientId(clientId)
     if (clientIdError) return clientIdError
-
-    if (jsonByteLength(settings) > limits.maxPayloadBytes) return `Client settings payload cannot exceed ${limits.maxPayloadBytes} bytes`
 
     const keys = Object.keys(settings)
     if (!keys.length) return 'At least one client setting is required'

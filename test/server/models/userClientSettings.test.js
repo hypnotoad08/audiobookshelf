@@ -137,13 +137,13 @@ describe('User client settings', () => {
       expect(User.validateClientSettings('abs-web-react', { 'theme-mode': 'dark' })).to.be.null
     })
 
-    it('accepts nested values up to the depth limit and rejects deeper', () => {
-      expect(User.validateClientSettings('abs-web-react', { theme: { mode: 'dark', contrast: 'high' } })).to.be.null
-      expect(User.validateClientSettings('abs-web-react', { a: { b: { c: 1 } } })).to.be.null
-      expect(User.validateClientSettings('abs-web-react', { a: { b: { c: { d: 1 } } } })).to.be.a('string')
+    it('accepts primitives and rejects structured values', () => {
+      expect(User.validateClientSettings('abs-web-react', { size: 160, theme: 'dark', collapsed: true })).to.be.null
+      expect(User.validateClientSettings('abs-web-react', { theme: { mode: 'dark' } })).to.be.a('string')
+      expect(User.validateClientSettings('abs-web-react', { tags: ['a', 'b'] })).to.be.a('string')
     })
 
-    it('rejects a non JSON value', () => {
+    it('rejects values that are not primitives', () => {
       expect(User.validateClientSettings('abs-web-react', { a: new Date() })).to.be.a('string')
       expect(User.validateClientSettings('abs-web-react', { a: undefined })).to.be.a('string')
       expect(User.validateClientSettings('abs-web-react', { a: NaN })).to.be.a('string')
@@ -159,19 +159,24 @@ describe('User client settings', () => {
     it('rejects reserved setting names as reserved rather than malformed', () => {
       for (const key of User.unsafeObjectKeys) {
         expect(User.validateClientSettings('abs-web-react', { [key]: 1 }), key).to.match(/is reserved/)
-        expect(User.validateClientSettings('abs-web-react', { nested: { [key]: 1 } }), `nested ${key}`).to.match(/reserved key/)
       }
     })
 
     it('rejects oversized payloads and values', () => {
       const limits = User.clientSettingsLimits
 
-      expect(User.validateClientSettings('abs-web-react', { a: Array(limits.maxPayloadBytes).fill(0) })).to.be.a('string')
       expect(User.validateClientSettings('abs-web-react', { a: 'x'.repeat(limits.maxStringLength + 1) })).to.be.a('string')
       expect(User.validateClientSettings('abs-web-react', { a: Number.MAX_SAFE_INTEGER * 2 })).to.be.a('string')
 
       const tooManyKeys = Object.fromEntries(Array.from({ length: limits.maxKeys + 1 }, (_, i) => [`k${i}`, 1]))
       expect(User.validateClientSettings('abs-web-react', tooManyKeys)).to.be.a('string')
+    })
+
+    it('accepts a payload that only removes settings', () => {
+      const bag = Object.fromEntries(Array.from({ length: User.clientSettingsLimits.maxKeys }, (_, i) => [`someQuiteLongSettingName${i}`, 'x'.repeat(10)]))
+      const removeAll = Object.fromEntries(Object.keys(bag).map((key) => [key, null]))
+
+      expect(User.validateClientSettings('abs-web-react', removeAll, { 'abs-web-react': bag })).to.be.null
     })
 
     it('rejects a new client id once the client limit is reached', () => {
@@ -217,10 +222,9 @@ describe('User client settings', () => {
   })
 
   describe('prototype pollution', () => {
-    it('rejects prototype mutating keys at the top level and when nested', () => {
+    it('rejects prototype mutating keys', () => {
       expect(User.validateClientSettings('abs-web-react', JSON.parse('{"__proto__": {"polluted": true}}'))).to.be.a('string')
       expect(User.validateClientSettings('abs-web-react', JSON.parse('{"constructor": 1}'))).to.be.a('string')
-      expect(User.validateClientSettings('abs-web-react', JSON.parse('{"a": {"__proto__": {"polluted": true}}}'))).to.be.a('string')
 
       expect({}.polluted).to.be.undefined
     })
